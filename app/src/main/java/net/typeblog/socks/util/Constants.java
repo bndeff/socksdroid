@@ -36,6 +36,6 @@ public class Constants
             PREF_ADV_DNS_PORT = "adv_dns_port",
             PREF_ADV_PER_APP = "adv_per_app",
             PREF_ADV_APP_BYPASS = "adv_app_bypass",
-            PREF_ADV_APP_LIST = "adv_app_list",
+            PREF_ADV_APP_LIST = "adv_app_list_msel",
             PREF_ADV_AUTO_CONNECT = "adv_auto_connect";
 }

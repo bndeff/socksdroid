@@ -8,6 +8,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        this.getFragmentManager().beginTransaction().replace(android.R.id.content, new ProfileFragment()).commit();
+        ProfileFragment fragment = new ProfileFragment();
+        fragment.setContext(getApplicationContext());
+        this.getFragmentManager().beginTransaction().replace(android.R.id.content, fragment).commit();
     }
 }

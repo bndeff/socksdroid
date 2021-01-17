@@ -94,8 +94,8 @@
             android:summary="@string/adv_app_bypass_sum"
             android:dependency="adv_per_app"/>
 
-        <EditTextPreference
-            android:key="adv_app_list"
+        <MultiSelectListPreference
+            android:key="adv_app_list_msel"
             android:title="@string/adv_app_list"
             android:summary="@string/adv_app_list_sum"
             android:dependency="adv_per_app"/>

@@ -3,19 +3,23 @@ package net.typeblog.socks;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageInfo;
 import android.net.VpnService;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.preference.CheckBoxPreference;
 import android.preference.EditTextPreference;
+import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.preference.ListPreference;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MenuInflater;
@@ -28,7 +32,14 @@ import net.typeblog.socks.util.Profile;
 import net.typeblog.socks.util.ProfileManager;
 import net.typeblog.socks.util.Utility;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static net.typeblog.socks.util.Constants.*;
 
@@ -71,9 +82,20 @@ public class ProfileFragment extends PreferenceFragment implements Preference.On
     private IVpnService mBinder;
 
     private ListPreference mPrefProfile, mPrefRoutes;
-    private EditTextPreference mPrefServer, mPrefPort, mPrefUsername, mPrefPassword,
-            mPrefDns, mPrefDnsPort, mPrefAppList, mPrefUDPGW;
+    private EditTextPreference mPrefServer;
+    private EditTextPreference mPrefPort;
+    private EditTextPreference mPrefUsername;
+    private EditTextPreference mPrefPassword;
+    private EditTextPreference mPrefDns;
+    private EditTextPreference mPrefDnsPort;
+    private MultiSelectListPreference mPrefAppList;
+    private EditTextPreference mPrefUDPGW;
     private CheckBoxPreference mPrefUserpw, mPrefPerApp, mPrefAppBypass, mPrefIPv6, mPrefUDP, mPrefAuto;
+    private Context context;
+
+    public void setContext(Context context) {
+        this.context = context;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -169,7 +191,11 @@ public class ProfileFragment extends PreferenceFragment implements Preference.On
             mProfile.setIsBypassApp(Boolean.parseBoolean(newValue.toString()));
             return true;
         } else if (p == mPrefAppList) {
-            mProfile.setAppList(newValue.toString());
+            List<String> newValues = new ArrayList<>((HashSet<String>) newValue);
+            String appList = TextUtils.join("\n", newValues);
+            mProfile.setAppList(appList);
+            updateAppList();
+            Log.d("setAppList", "appList:\n" + mProfile.getAppList());
             return true;
         } else if (p == mPrefIPv6) {
             mProfile.setHasIPv6(Boolean.parseBoolean(newValue.toString()));
@@ -220,7 +246,7 @@ public class ProfileFragment extends PreferenceFragment implements Preference.On
         mPrefDnsPort = (EditTextPreference) findPreference(PREF_ADV_DNS_PORT);
         mPrefPerApp = (CheckBoxPreference) findPreference(PREF_ADV_PER_APP);
         mPrefAppBypass = (CheckBoxPreference) findPreference(PREF_ADV_APP_BYPASS);
-        mPrefAppList = (EditTextPreference) findPreference(PREF_ADV_APP_LIST);
+        mPrefAppList = (MultiSelectListPreference) findPreference(PREF_ADV_APP_LIST);
         mPrefIPv6 = (CheckBoxPreference) findPreference(PREF_IPV6_PROXY);
         mPrefUDP = (CheckBoxPreference) findPreference(PREF_UDP_PROXY);
         mPrefUDPGW = (EditTextPreference) findPreference(PREF_UDP_GW);
@@ -271,7 +297,78 @@ public class ProfileFragment extends PreferenceFragment implements Preference.On
         mPrefUDPGW.setText(mProfile.getUDPGW());
         resetText(mPrefServer, mPrefPort, mPrefUsername, mPrefPassword, mPrefDns, mPrefDnsPort, mPrefUDPGW);
 
-        mPrefAppList.setText(mProfile.getAppList());
+        updateAppList();
+    }
+
+    private void updateAppList() {
+        HashSet<String> selectedApps = new HashSet<String>(Arrays.asList(mProfile.getAppList().split("\n")));
+        List<String> selectedAndExistsApps = new ArrayList<String>();
+
+        Map<String, String> packages = getPackages();
+        CharSequence[] titles = new CharSequence[packages.size()];
+        CharSequence[] packageNames = new CharSequence[packages.size()];
+
+        //--------------- Sort the application list ---------------
+        int i = 0;
+
+        // First add the selected application so that
+        // the selected application will appear in the front
+        for (Map.Entry<String, String> entry : packages.entrySet()) {
+            if (selectedApps.contains(entry.getValue())) {
+                selectedAndExistsApps.add(entry.getValue());
+                packageNames[i] = entry.getValue();
+                titles[i] = entry.getKey();
+                i++;
+            }
+        }
+        // Then add unselected apps
+        for (Map.Entry<String, String> entry : packages.entrySet()) {
+            if (!selectedApps.contains(entry.getValue())) {
+                packageNames[i] = entry.getValue();
+                titles[i] = entry.getKey();
+                i++;
+            }
+        }
+
+        mPrefAppList.setEntries(titles);
+        mPrefAppList.setEntryValues(packageNames);
+
+        // Update the stored AppList (non-existent applications was deleted)
+        mProfile.setAppList(TextUtils.join("\n", selectedAndExistsApps));
+    }
+
+    private Map<String, String> getPackages() {
+        Map<String, String> packages = new TreeMap<String, String>();
+        try {
+            String myself = context.getApplicationInfo().packageName;
+            List<PackageInfo> packageInfos = context.getPackageManager().getInstalledPackages(0);
+
+            // Check if multiple applications have the same name
+            Map<String, Integer> nameCount = new HashMap<String, Integer>();
+            for (PackageInfo info : packageInfos) {
+                String appName = info.applicationInfo.loadLabel(context.getPackageManager()).toString();
+                if (nameCount.containsKey(appName)) {
+                    nameCount.put(appName, nameCount.get(appName) + 1);
+                } else {
+                    nameCount.put(appName, 1);
+                }
+            }
+
+            for (PackageInfo info : packageInfos) {
+                String appName = info.applicationInfo.loadLabel(context.getPackageManager()).toString();
+                String packageName = info.packageName;
+                if (!myself.equals(packageName)) {
+                    // If the name is duplicated, automatically add the package name as a suffix
+                    if (nameCount.get(appName) > 1) {
+                        appName = appName + " (" + packageName + ")";
+                    }
+                    packages.put(appName, packageName);
+                }
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();;
+        }
+        return packages;
     }
 
     private void resetList(ListPreference... pref) {

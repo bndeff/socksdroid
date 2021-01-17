@@ -31,7 +31,7 @@
     <string name="adv_app_bypass">Bypass Mode</string>
     <string name="adv_app_bypass_sum">Enable this option to bypass selected apps instead of proxying them</string>
     <string name="adv_app_list">App List</string>
-    <string name="adv_app_list_sum">Enter one app\'s package name in one line. See Settings -> Apps for package names of apps.</string>
+    <string name="adv_app_list_sum">Select apps to apply or bypass the proxy</string>
 
     <string name="prof_add">Add Profile</string>
     <string name="prof_del">Delete Profile</string>
